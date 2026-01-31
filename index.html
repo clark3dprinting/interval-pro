@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interval Pro | Accuracy Mode</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --accent: #00ff88;
+      --warn: #ff0000;
+      --text: #ffffff;
+      --border-soft: rgba(255, 255, 255, 0.1);
+    }
+
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; }
+
+    .screen-container {
+      width: 100vw; height: 100vh;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      box-sizing: border-box; border: 0px solid transparent; transition: border 0.2s ease;
+    }
+
+    #phase { font-size: 2rem; letter-spacing: 8px; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    #timer { font-size: 14rem; font-weight: 900; line-height: 1; margin: 0; font-variant-numeric: tabular-nums; }
+   
+    .stats { display: flex; gap: 80px; margin-top: 40px; margin-bottom: 60px; }
+    .stat-box { font-size: 0.9rem; color: #666; text-align: center; font-weight: bold; }
+    .stat-box span { display: block; font-size: 4rem; color: white; }
+
+    .controls { display: flex; gap: 15px; position: absolute; bottom: 40px; }
+    button { background: rgba(255, 255, 255, 0.08); color: white; border: 1px solid var(--border-soft); padding: 14px 28px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+    button:active { transform: scale(0.95); }
+    .btn-primary { background: var(--accent); color: black; border: none; }
+
+    .alert-active { border: 20px solid var(--warn); }
+    .alert-active #timer { color: var(--warn); animation: pulseText 0.6s infinite; }
+
+    @keyframes pulseText {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    .settings-btn { position: absolute; top: 30px; right: 30px; font-size: 28px; cursor: pointer; opacity: 0.3; }
+    .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .modal-content { background: #111; padding: 40px; border-radius: 24px; width: 360px; border: 1px solid #333; }
+    input, select { width: 100%; background: #1a1a1a; border: 1px solid #333; color: white; padding: 12px; margin: 10px 0 20px; border-radius: 10px; box-sizing: border-box; }
+    #intervals { margin-top: 15px; max-height: 150px; overflow-y: auto; font-size: 0.85rem; border-top: 1px solid #222; padding-top: 10px; }
+    .interval-item { display: flex; justify-content: space-between; padding: 6px 0; color: #888; }
+  </style>
+</head>
+<body>
+
+<div class="screen-container" id="mainScreen">
+  <div class="settings-btn" onclick="toggleSettings()">⚙️</div>
+  <div id="phase">Ready</div>
+  <div id="timer">0</div>
+  <div class="stats">
+    <div class="stat-box">RUN <span id="runCount">0</span></div>
+    <div class="stat-box">REST <span id="restCount">0</span></div>
+  </div>
+  <div class="controls">
+    <button class="btn-primary" onclick="start()">START</button>
+    <button onclick="stop()">STOP</button>
+    <button onclick="prevInterval()">BACK</button>
+    <button onclick="resetTimer()">RESET</button>
+  </div>
+</div>
+
+<div class="modal" id="settingsModal">
+  <div class="modal-content">
+    <h2>Settings</h2>
+    <div style="display:flex; gap:10px">
+      <div style="flex:1"><label>Run (s)</label><input type="number" id="defaultRun" value="45"></div>
+      <div style="flex:1"><label>Rest (s)</label><input type="number" id="defaultRest" value="15"></div>
+    </div>
+    <select id="pattern">
+      <option value="ALT">Run / Rest</option>
+      <option value="DOUBLE_REST">Run / Rest / Rest</option>
+      <option value="DOUBLE_RUN">Run / Run / Rest</option>
+    </select>
+    <button class="btn-primary" style="width:100%" onclick="addInterval()">+ Add to Queue</button>
+    <div id="intervals"></div>
+    <div style="display:flex; gap:10px; margin-top:20px">
+      <button onclick="clearQueue()" style="flex:1; color:#ff4444">Clear All</button>
+      <button onclick="toggleSettings()" style="flex:1">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let intervals = [], currentIndex = 0, timeLeft = 0, timer = null;
+  let runCount = 0, restCount = 0, readyCount = 0; // readyCount is invisible
+  let isPrep = false;
+
+  const timerEl = document.getElementById('timer'), phaseEl = document.getElementById('phase'), mainScreen = document.getElementById('mainScreen');
+
+  function toggleSettings() {
+    const modal = document.getElementById('settingsModal');
+    modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+  }
+
+  function addInterval() {
+    const pattern = document.getElementById('pattern').value;
+    const push = (t) => {
+      const d = document.getElementById(t === 'RUN' ? 'defaultRun' : 'defaultRest').value;
+      intervals.push({ type: t, duration: parseInt(d) });
+    };
+    if (pattern === 'ALT') { push('RUN'); push('REST'); }
+    else if (pattern === 'DOUBLE_REST') { push('RUN'); push('REST'); push('REST'); }
+    else { push('RUN'); push('RUN'); push('REST'); }
+    renderList();
+  }
+
+  function renderList() {
+    document.getElementById('intervals').innerHTML = intervals.map((int, i) =>
+      `<div class="interval-item"><span>#${i+1} ${int.type}</span><span>${int.duration}s</span></div>`
+    ).join('');
+  }
+
+  function clearQueue() { intervals = []; renderList(); }
+
+  function start() {
+    if (timer) clearInterval(timer);
+    if (intervals.length === 0) return;
+
+    const currentType = intervals[currentIndex].type;
+
+    if (currentType === 'RUN') {
+      let prep = 20;
+      phaseEl.textContent = 'GET READY';
+      isPrep = true;
+      readyCount++; // Tracking preparation internally
+      timer = setInterval(() => {
+        timerEl.textContent = prep;
+        checkAlert(prep);
+        if (prep <= 0) {
+          clearInterval(timer);
+          mainScreen.classList.remove('alert-active');
+          isPrep = false;
+          startWorkout();
+        }
+        prep--;
+      }, 1000);
+    } else {
+      isPrep = false;
+      startWorkout();
+    }
+  }
+
+  function startWorkout() {
+    loadInterval();
+    timer = setInterval(() => {
+      timeLeft--;
+      timerEl.textContent = timeLeft;
+      checkAlert(timeLeft);
+      if (timeLeft < 0) {
+        clearInterval(timer);
+        currentIndex++;
+        if (currentIndex >= intervals.length) {
+          stop(); phaseEl.textContent = "FINISH"; timerEl.textContent = "0";
+        } else {
+          start();
+        }
+      }
+    }, 1000);
+  }
+
+  function prevInterval() {
+    if (intervals.length === 0) return;
+    if (currentIndex === 0 && isPrep) return;
+
+    if (timer) clearInterval(timer);
+    mainScreen.classList.remove('alert-active');
+
+    // Only undo if we were in the middle of a counted interval
+    if (!isPrep) {
+      const current = intervals[currentIndex];
+      if (current.type === 'RUN' && runCount > 0) runCount--;
+      if (current.type === 'REST' && restCount > 0) restCount--;
+    } else {
+      readyCount--; // Undo the hidden prep count
+    }
+   
+    if (currentIndex > 0) currentIndex--;
+
+    updateDisplayStats();
+    start();
+  }
+
+  function updateDisplayStats() {
+    document.getElementById('runCount').textContent = runCount;
+    document.getElementById('restCount').textContent = restCount;
+  }
+
+  function checkAlert(val) {
+    if (val <= 5 && val >= 0) mainScreen.classList.add('alert-active');
+    else mainScreen.classList.remove('alert-active');
+  }
+
+  function loadInterval() {
+    const cur = intervals[currentIndex];
+    timeLeft = cur.duration;
+    timerEl.textContent = timeLeft;
+    phaseEl.textContent = cur.type;
+   
+    // VISIBLE counts only happen here (after prep ends)
+    if (cur.type === 'RUN') runCount++;
+    else if (cur.type === 'REST') restCount++;
+   
+    updateDisplayStats();
+  }
+
+  function stop() { clearInterval(timer); timer = null; mainScreen.classList.remove('alert-active'); phaseEl.textContent = 'STOPPED'; }
+
+  function resetTimer() {
+    stop(); currentIndex = 0; runCount = 0; restCount = 0; readyCount = 0; isPrep = false;
+    timerEl.textContent = '0'; phaseEl.textContent = 'READY'; updateDisplayStats();
+  }
+</script>
+</body>
+</html>
