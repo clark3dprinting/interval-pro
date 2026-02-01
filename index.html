@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+
+    <title>Interval Pro | Accuracy Mode</title>
+
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icon.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icon.png">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Interval Pro">
+    <meta name="theme-color" content="#050505">
+
+    <style>
+        :root{
+         --bg:#050505;
+         --accent:#00ff88;
+         --warn:#ff0000;
+         --text:#ffffff;
+         --border-soft:rgba(255,255,255,.12);
+        }
+
+        html,body{
+         margin:0;
+         padding:0;
+         width:100%;
+         height:100dvh;
+         background:var(--bg);
+         color:var(--text);
+         font-family:Inter,system-ui,sans-serif;
+         overflow:hidden;
+        }
+
+        .screen-container{
+         height:100dvh;
+         display:flex;
+         flex-direction:column;
+         justify-content:space-evenly;
+         align-items:center;
+         text-align:center;
+
+         padding:
+           env(safe-area-inset-top)
+           5vw
+           calc(env(safe-area-inset-bottom) + 2vh);
+
+         box-sizing:border-box;
+        }
+
+        #phase{
+         font-size:clamp(20px, 3.5vh, 48px);
+         letter-spacing:3px;
+         text-transform:uppercase;
+         color:var(--accent);
+        }
+
+        #timer{
+         font-size:clamp(120px, 34vh, 340px);
+         font-weight:900;
+         line-height:1;
+        }
+
+        .stats{
+         display:flex;
+         gap:12vw;
+        }
+
+        .stat-box{
+         font-size:clamp(14px, 2.4vh, 22px);
+         color:#777;
+         font-weight:700;
+        }
+
+        .stat-box span{
+         display:block;
+         font-size:clamp(60px, 12vh, 160px);
+         color:white;
+        }
+
+        .controls{
+         display:flex;
+         gap:2vw;
+         flex-wrap:wrap;
+         justify-content:center;
+         width:100%;
+        }
+
+        button{
+         flex:1 1 40%;
+         min-width:110px;
+         background:rgba(255,255,255,.08);
+         color:white;
+         border:1px solid var(--border-soft);
+         padding:clamp(8px,1.8vh,14px) 0;
+         border-radius:12px;
+         font-weight:700;
+         font-size:clamp(12px,2vh,16px);
+        }
+
+        .btn-primary{
+         background:var(--accent);
+         color:black;
+         border:none;
+        }
+
+        .alert-active{
+         border:8px solid var(--warn);
+        }
+        .alert-active #timer{
+         color:var(--warn);
+         animation:pulse .6s infinite;
+        }
+
+        @keyframes pulse{
+         0%{transform:scale(1);}
+         50%{transform:scale(1.06);}
+         100%{transform:scale(1);}
+        }
+
+        .settings-btn{
+         position:absolute;
+         top:calc(env(safe-area-inset-top) + 1vh);
+         right:4vw;
+         font-size:clamp(26px,4vh,44px);
+         opacity:.35;
+        }
+
+        .modal{
+         position:fixed;
+         inset:0;
+         background:rgba(0,0,0,.95);
+         display:none;
+         align-items:center;
+         justify-content:center;
+        }
+
+        .modal-content{
+         background:#111;
+         padding:5vw;
+         border-radius:20px;
+         width:92%;
+         max-width:440px;
+         border:1px solid #333;
+         max-height:90dvh;
+         overflow:auto;
+        }
+
+        input,select{
+         width:100%;
+         background:#1a1a1a;
+         border:1px solid #333;
+         color:white;
+         padding:12px;
+         margin:8px 0 16px;
+         border-radius:10px;
+         font-size:16px;
+        }
+
+        #intervals{
+         max-height:180px;
+         overflow-y:auto;
+         font-size:14px;
+         border-top:1px solid #222;
+         padding-top:10px;
+        }
+
+        .interval-item{
+         display:flex;
+         justify-content:space-between;
+         padding:6px 0;
+         color:#888;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="screen-container" id="mainScreen">
+        <div class="settings-btn" onclick="toggleSettings()">⚙️</div>
+
+        <div id="phase">Ready</div>
+        <div id="timer">0</div>
+
+        <div class="stats">
+            <div class="stat-box">RUN <span id="runCount">0</span></div>
+            <div class="stat-box">REST <span id="restCount">0</span></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-primary" onclick="start()">START</button>
+            <button onclick="stop()">STOP</button>
+            <button onclick="prevInterval()">BACK</button>
+            <button onclick="resetTimer()">RESET</button>
+        </div>
+    </div>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <h2>Settings</h2>
+
+            <div style="display:flex;gap:3vw">
+                <div style="flex:1">
+                    <label>Run (s)</label>
+                    <input type="number" id="defaultRun" value="45">
+                </div>
+                <div style="flex:1">
+                    <label>Rest (s)</label>
+                    <input type="number" id="defaultRest" value="15">
+                </div>
+            </div>
+
+            <select id="pattern">
+                <option value="ALT">Run / Rest</option>
+                <option value="DOUBLE_REST">Run / Rest / Rest</option>
+                <option value="DOUBLE_RUN">Run / Run / Rest</option>
+            </select>
+
+            <button class="btn-primary" style="width:100%" onclick="addInterval()">+ Add to Queue</button>
+            <div id="intervals"></div>
+
+            <div style="display:flex;gap:3vw;margin-top:4vw">
+                <button onclick="clearQueue()" style="flex:1;color:#ff4444">Clear All</button>
+                <button onclick="toggleSettings()" style="flex:1">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let intervals=[], currentIndex=0, timeLeft=0, timer=null;
+        let runCount=0, restCount=0;
+
+        const timerEl=document.getElementById('timer');
+        const phaseEl=document.getElementById('phase');
+        const mainScreen=document.getElementById('mainScreen');
+        const runCountEl=document.getElementById('runCount');
+        const restCountEl=document.getElementById('restCount');
+
+        function toggleSettings(){
+         const m=document.getElementById('settingsModal');
+         m.style.display=(m.style.display==='flex')?'none':'flex';
+        }
+
+        function addInterval(){
+         const pattern=document.getElementById('pattern').value;
+         const push=t=>{
+          const d=parseInt(document.getElementById(t==='RUN'?'defaultRun':'defaultRest').value);
+          intervals.push({type:t,duration:d});
+         };
+         if(pattern==='ALT'){push('RUN');push('REST');}
+         else if(pattern==='DOUBLE_REST'){push('RUN');push('REST');push('REST');}
+         else{push('RUN');push('RUN');push('REST');}
+         renderList();
+        }
+
+        function renderList(){
+         document.getElementById('intervals').innerHTML=
+          intervals.map((i,n)=>
+           `<div class="interval-item"><span>#${n+1} ${i.type}</span><span>${i.duration}s</span></div>`
+          ).join('');
+        }
+
+        function clearQueue(){intervals=[];renderList();}
+
+        function start(){
+         if(timer) clearInterval(timer);
+         if(intervals.length===0) return;
+         startWithPrep();
+        }
+
+        function prevInterval(){
+         if(intervals.length===0) return;
+         if(timer) clearInterval(timer);
+         if(currentIndex>0) currentIndex--;
+         startWithPrep();
+        }
+
+        function startWithPrep(){
+         let prep=20;
+         phaseEl.textContent='GET READY';
+         timer=setInterval(()=>{
+          timerEl.textContent=prep;
+          checkAlert(prep);
+          if(prep<=0){
+           clearInterval(timer);
+           mainScreen.classList.remove('alert-active');
+           startWorkout();
+          }
+          prep--;
+         },1000);
+        }
+
+        function startWorkout(){
+         loadInterval();
+         timer=setInterval(()=>{
+          timeLeft--;
+          timerEl.textContent=timeLeft;
+          checkAlert(timeLeft);
+
+          if(timeLeft<0){
+           clearInterval(timer);
+           const done=intervals[currentIndex];
+           if(done.type==='RUN') runCount++;
+           if(done.type==='REST') restCount++;
+           updateDisplayStats();
+           currentIndex++;
+
+           if(currentIndex>=intervals.length){
+            stop();
+            phaseEl.textContent='FINISH';
+            timerEl.textContent='0';
+           } else startWorkout();
+          }
+         },1000);
+        }
+
+        function loadInterval(){
+         const cur=intervals[currentIndex];
+         timeLeft=cur.duration;
+         timerEl.textContent=timeLeft;
+         phaseEl.textContent=cur.type;
+        }
+
+        function updateDisplayStats(){
+         runCountEl.textContent=runCount;
+         restCountEl.textContent=restCount;
+        }
+
+        function checkAlert(v){
+         if(v<=5 && v>=0) mainScreen.classList.add('alert-active');
+         else mainScreen.classList.remove('alert-active');
+        }
+
+        function stop(){
+         clearInterval(timer);
+         timer=null;
+         phaseEl.textContent='STOPPED';
+         mainScreen.classList.remove('alert-active');
+        }
+
+        function resetTimer(){
+         stop();
+         currentIndex=0;
+         runCount=0;
+         restCount=0;
+         timerEl.textContent='0';
+         phaseEl.textContent='READY';
+         updateDisplayStats();
+        }
+    </script>
+
+</body>
+</html>
